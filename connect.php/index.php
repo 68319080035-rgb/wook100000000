@@ -1,13 +1,12 @@
 <?php
 session_start();
-
-// ตรวจสอบสิทธิ์ Admin
-if (!isset($_SESSION['cus_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    echo "<div class='alert alert-danger'>คุณไม่มีสิทธิ์เข้าถึงหน้านี้</div>";
+if (!isset($_SESSION['cus_id']) || ($_SESSION['role'] ?? 'user') !== 'admin') {
+    echo "<div class='alert alert-danger'>คุณไม่มีสิทธิ์เข้าถึงหน้าผู้ดูแลระบบ</div>";
     exit();
 }
 
 $admin_name = htmlspecialchars($_SESSION['fullname'] ?? 'ผู้ดูแลระบบ');
+$current_role = htmlspecialchars($_SESSION['role'] ?? 'NOT SET'); 
 ?>
 
 <!DOCTYPE html>
@@ -15,7 +14,7 @@ $admin_name = htmlspecialchars($_SESSION['fullname'] ?? 'ผู้ดูแล�
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard | ข้อมูลผู้ใช้งาน</title>
+<title>Admin Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -26,70 +25,72 @@ body { font-family: 'Noto Sans Thai', sans-serif; background-color: #f0f2f5; pad
 </style>
 </head>
 <body>
-
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock-fill"></i> ADMIN PANEL</a>
-        <div class="d-flex align-items-center">
-            <span class="navbar-text text-white me-3">สวัสดี, <?php echo $admin_name; ?></span>
-            <a class="btn btn-outline-light btn-sm" href="logout.php"><i class="bi bi-box-arrow-right"></i> ออก</a>
-        </div>
-    </div>
+<div class="container-fluid">
+<a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock-fill"></i> ADMIN PANEL</a>
+<div class="d-flex align-items-center">
+<span class="navbar-text text-white me-3">สวัสดี, <?php echo $admin_name; ?></span>
+<span class="badge bg-warning text-dark me-3">ROLE: <?php echo $current_role; ?></span>
+<a class="btn btn-outline-light btn-sm" href="logout.php"><i class="bi bi-box-arrow-right"></i> ออก</a>
+</div>
+</div>
 </nav>
 
 <div class="admin-card">
-    <h2 class="fw-bold"><i class="bi bi-person-lines-fill"></i> ข้อมูลผู้ใช้งาน</h2>
-    <hr>
-    <button class="btn btn-success btn-lg mb-4" id="fetchDataBtn">
-        <i class="bi bi-database-check"></i> ดึงข้อมูลผู้ใช้
-    </button>
-    <div id="dataOutput">
-        <div class="alert alert-info text-center" role="alert">คลิกปุ่มด้านบนเพื่อแสดงข้อมูล</div>
-    </div>
+<h2 class="fw-bold"><i class="bi bi-person-lines-fill"></i> ข้อมูลผู้ใช้งาน</h2>
+<hr>
+
+<!-- ปุ่มกรองสถานะ -->
+<div class="mb-3">
+    <button class="btn btn-success me-2 filterBtn" data-status="user"><i class="bi bi-person"></i> User</button>
+    <button class="btn btn-danger me-2 filterBtn" data-status="admin"><i class="bi bi-shield-lock-fill"></i> Admin</button>
+    <button class="btn btn-secondary filterBtn" data-status="all"><i class="bi bi-list-ul"></i> All</button>
+</div>
+<a href="register_form.php" class="btn btn-primary">
+    สมัครสมาชิกใหม่
+</a>
+<!-- พื้นที่แสดงตาราง -->
+<div id="dataOutput">
+<div class="alert alert-info text-center">คลิกปุ่มด้านบนเพื่อแสดงข้อมูล</div>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// ดึงข้อมูลผู้ใช้
-document.getElementById('fetchDataBtn').addEventListener('click', function() {
+// ฟังก์ชันดึงข้อมูล
+function fetchUsers(status = 'all') {
     const outputDiv = document.getElementById('dataOutput');
-    const button = this;
-
     outputDiv.innerHTML = `<div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">กำลังดึงข้อมูล...</p></div>`;
-    button.disabled = true;
 
-    fetch('fetch_user_data.php')
+    fetch('fetch_user_data.php?status=' + status)
         .then(res => {
             if (res.status === 403) throw new Error('การเข้าถึงถูกปฏิเสธ (ไม่มีสิทธิ์ Admin)');
             if (!res.ok) throw new Error(`HTTP Error! Status: ${res.status}`);
             return res.text();
         })
         .then(data => { outputDiv.innerHTML = data.trim() || `<div class="alert alert-warning text-center">ไม่พบข้อมูล</div>`; })
-        .catch(err => { outputDiv.innerHTML = `<div class="alert alert-danger text-center">**ข้อผิดพลาด** ${err.message}</div>`; })
-        .finally(() => { button.disabled = false; });
+        .catch(err => { outputDiv.innerHTML = `<div class="alert alert-danger text-center">**ข้อผิดพลาด** ${err.message}</div>`; });
+}
+
+// ปุ่มกรอง
+document.querySelectorAll('.filterBtn').forEach(btn => {
+    btn.addEventListener('click', () => fetchUsers(btn.dataset.status));
 });
 
-// Delete user
+// ปุ่ม Edit/Delete
 document.addEventListener("click", function(e){
-    const btn = e.target.closest(".deleteBtn");
-    if(btn){
-        let user_id = btn.dataset.id;
+    const delBtn = e.target.closest(".deleteBtn");
+    const editBtn = e.target.closest(".editBtn");
+
+    if(delBtn){
         if(!confirm("ต้องการลบผู้ใช้นี้จริงหรือไม่?")) return;
-        fetch("user_delete.php?id=" + user_id)
+        fetch("user_delete.php?id=" + delBtn.dataset.id)
             .then(res => res.text())
-            .then(msg => {
-                alert(msg);
-                document.getElementById("fetchDataBtn").click();
-            });
+            .then(msg => { alert(msg); fetchUsers('all'); });
     }
-});
 
-// Edit user
-document.addEventListener("click", function(e){
-    const btn = e.target.closest(".editBtn");
-    if(btn){
-        let user_id = btn.dataset.id;
-        window.location = "user_edit.php?id=" + user_id;
+    if(editBtn){
+        window.location = "user_edit.php?id=" + editBtn.dataset.id;
     }
 });
 </script>
